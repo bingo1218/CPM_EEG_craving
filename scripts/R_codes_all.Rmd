@@ -1,0 +1,23 @@
+---
+title: "R_codes_all"
+author: "HBZ"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load necessary libraries
+library(readxl)
+library(dplyr)
+library(knitr)
+
+# Set the path to your data file
+data_path <- "data/all_data_2024.xlsx"
+
+# Load the data from the Excel file
+data <- read_excel(data_path, sheet = "Training")
+```
+
