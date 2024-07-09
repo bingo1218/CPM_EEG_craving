@@ -9,15 +9,200 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
+#setwd("E:/research_data/Methamphetamine_ERP_EGI/CPM_EEG_craving")
+```
+
+## load packages and data
+```{r}
+setwd("E:/research_data/Methamphetamine_ERP_EGI/CPM_EEG_craving")
 # Load necessary libraries
 library(readxl)
 library(dplyr)
 library(knitr)
-
-# Set the path to your data file
-data_path <- "data/all_data_2024.xlsx"
+library(kableExtra)
 
 # Load the data from the Excel file
-data <- read_excel(data_path, sheet = "Training")
+
+data_train <- read_excel('data/all_data_2024.xlsx', sheet = "Training")
+data_test <- read_excel("data/all_data_2024.xlsx", sheet = "Test")
 ```
 
+
+## Correlation of different variables 
+```{r}
+library(Hmisc)
+
+# Define the columns to include in the correlation matrix
+columns_to_include <- c("age","edu_years","addiction_years", "withdraw_day",    "dose_month","craving_score","DSM","PSQI","BDI","BIS_total","BAI")
+# Ensure these columns exist in the dataset
+columns_to_include <- columns_to_include[columns_to_include %in% colnames(data_train)]
+
+# Select the columns to perform the correlation analysis
+data_to_correlate <- data_train %>% select(all_of(columns_to_include))
+
+# Perform the Pearson correlation analysis
+correlation_results <- rcorr(as.matrix(data_to_correlate), type = "pearson")
+
+# Extract the correlation coefficients (r values) and round to 3 decimal places
+correlation_matrix <- round(correlation_results$r, 2)
+
+# Extract the p-values and round to 3 decimal places
+p_value_matrix <- round(correlation_results$P, 3)
+
+# Print the correlation coefficients
+print("Correlation Coefficients with craving (r values):")
+print(correlation_matrix["craving_score",])
+
+# Print the p-values
+print("P-values with craving:")
+print(p_value_matrix["craving_score",])
+
+```
+
+
+## Comparison between training set and Test set profile
+```{r}
+# Add a column to distinguish between training and test sets
+data_train$Set <- "Training"
+data_test$Set <- "Test"
+
+# Combine the data
+combined_data <- bind_rows(data_train, data_test)
+
+# Function to calculate mean, SD, t-value, and p-value
+calculate_statistics <- function(data, variable) {
+  summary_stats <- data %>%
+    group_by(Set) %>%
+    summarise(
+      mean = mean(get(variable), na.rm = TRUE),
+      sd = sd(get(variable), na.rm = TRUE)
+    )
+  
+  t_test <- t.test(data[[variable]] ~ data$Set, var.equal = FALSE)
+  t_value <- t_test$statistic
+  p_value <- t_test$p.value
+  
+  result <- data.frame(
+    Variable = variable,
+    Training = paste0(format(round(summary_stats$mean[summary_stats$Set == "Training"], 2), nsmall = 2), " (", format(round(summary_stats$sd[summary_stats$Set == "Training"], 2), nsmall = 2), ")"),
+    Test = paste0(format(round(summary_stats$mean[summary_stats$Set == "Test"], 2), nsmall = 2), " (", format(round(summary_stats$sd[summary_stats$Set == "Test"], 2), nsmall = 2), ")"),
+    t_value = format(round(t_value, 2), nsmall = 2),
+    p_value = format(round(p_value, 3), nsmall = 3)
+  )
+  
+  return(result)
+}
+
+# List of variables to summarize
+variables <- c("age", "edu_years", "addiction_years", "dose_month", "withdraw_day", "DSM", "PSQI", "BDI", "BIS_total", "BAI", "craving_score")
+
+# Calculate statistics for each variable and combine into a single data frame
+summary_table <- do.call(rbind, lapply(variables, calculate_statistics, data = combined_data))
+
+# Create the table
+kable(summary_table, format = "html", col.names = c("Variable", "Training (n=144)", "Test (n=47)", "t-value", "p-value")) %>%
+  kable_styling(full_width = FALSE, position = "left")
+```
+
+## for other CPM related anlaysis, look at the Matlab folder and run in Matlab
+
+
+
+## mediation analysis
+
+### Data Prepartion
+
+``` {r}
+library(psych)
+library(mediation)
+library(diagram)
+library(readxl)
+library(DiagrammeR)
+setwd("E:/research_data/Methamphetamine_ERP_EGI/connectome-based analysis/CPM_ZHB/CPM_formal/0718_update/supplement/scripts/mediation_test")
+source("process.R")
+
+# Import the dataset
+d <- read_excel("Mediation_test.xlsx", sheet = 'Combine')
+d$BDI <- as.numeric(d$BDI)
+```
+
+## Data normalization
+```{R}
+#d <- d[1:144,]
+# data visualization
+hist(d$craving)
+describe(d$craving)
+hist(d$abstinence)
+describe(d$abstinence)
+hist(d$brain)
+describe(d$brain)
+hist(d$PSQI)
+describe(d$PSQI)
+
+# data normalization
+d$craving_z <-  as.numeric(scale(d$craving, center = TRUE, scale = TRUE))
+d$abstinence_z <-  as.numeric(scale(d$abstinence, center = TRUE, scale = TRUE))
+d$brain_z <-  as.numeric(scale(d$brain, center = TRUE, scale = TRUE))
+d$PSQI_z <-  as.numeric(scale(d$PSQI, center = TRUE, scale = TRUE))
+
+d$BIS_z <-  as.numeric(scale(d$BIS_total, center = TRUE, scale = TRUE))
+d$BISnoplan_z <-  as.numeric(scale(d$BIS_noplan, center = TRUE, scale = TRUE))
+d$BISmotor_z <-  as.numeric(scale(d$BIS_motor, center = TRUE, scale = TRUE))
+d$BISattention_z <-  as.numeric(scale(d$BIS_attention, center = TRUE, scale = TRUE))
+
+
+d$BDI_z <-  as.numeric(scale(d$BDI, center = TRUE, scale = TRUE))
+d$BAI_z <-  as.numeric(scale(d$BAI, center = TRUE, scale = TRUE))
+```
+
+## the relationship between Brain - BIS - craving
+### parrelell mediation model
+#### using BIS-total, BAI, and BDI
+```{R}
+# define X, Y, and M
+d$X = d$brain_z
+d$Y = d$craving_z
+
+#Computing linear regression for PATH A1
+Reg2PathA1 <- lm(BDI_z ~ X, data = d)
+summary(Reg2PathA1)
+
+#Computing linear regression for PATH A2
+Reg2PathA2 <- lm(BIS_z ~ X, data = d)
+summary(Reg2PathA2)
+
+#Computing linear regression for PATH A3
+Reg2PathA3 <- lm(BAI_z ~ X, data = d)
+summary(Reg2PathA3)
+
+
+#Conducting linear regression for PATH B1, B2, and C'
+Reg2DirectEffect <- lm(Y ~ BDI_z + BIS_z + BAI_z + X, data = d)
+summary(Reg2DirectEffect)
+
+# Using PROCESS macro 
+
+process(d, y="Y", x="X", m= c("BDI_z", "BIS_z","BAI_z"), model = 4,  effsize = 1,total = 1,  normal = 1, boot = 5000, seed = 9999)  
+
+```
+
+### abstinence -> brain  -> craving (brain only)
+
+```{R}
+# define X, Y, and M
+d$X = d$abstinence_z
+d$Y = d$craving_z
+
+#Computing linear regression for PATH A
+Reg2PathA <- lm(brain_z ~ X, data = d)
+summary(Reg2PathA)
+
+#Conducting linear regression for PATH B and C'
+Reg2DirectEffect <- lm(Y ~ brain_z + X, data = d)
+summary(Reg2DirectEffect)
+
+# Using PROCESS macro 
+
+process(d, y="Y", x="X", m= c("brain_z"), model = 4,  effsize = 1,total = 1,  normal = 1, boot = 5000, seed = 9999)  
+
+```
