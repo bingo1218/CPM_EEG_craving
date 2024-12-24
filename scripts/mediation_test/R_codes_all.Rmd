@@ -9,12 +9,12 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-#setwd("E:/research_data/Methamphetamine_ERP_EGI/CPM_EEG_craving")
+#setwd("/Users/tmslab/Desktop/Research/CPM+craving+MUD/github_clone/CPM_EEG_craving/")
 ```
 
 ## load packages and data
 ```{r}
-setwd("E:/research_data/Methamphetamine_ERP_EGI/CPM_EEG_craving")
+setwd("/Users/tmslab/Desktop/Research/CPM+craving+MUD/github_clone/CPM_EEG_craving/")
 # Load necessary libraries
 library(readxl)
 library(dplyr)
@@ -118,7 +118,7 @@ library(mediation)
 library(diagram)
 library(readxl)
 library(DiagrammeR)
-setwd("E:/research_data/Methamphetamine_ERP_EGI/connectome-based analysis/CPM_ZHB/CPM_formal/0718_update/supplement/scripts/mediation_test")
+setwd("/Users/tmslab/Desktop/Research/CPM+craving+MUD/github_clone/CPM_EEG_craving/scripts/mediation_test")
 source("process.R")
 
 # Import the dataset
@@ -204,5 +204,27 @@ summary(Reg2DirectEffect)
 # Using PROCESS macro 
 
 process(d, y="Y", x="X", m= c("brain_z"), model = 4,  effsize = 1,total = 1,  normal = 1, boot = 5000, seed = 9999)  
+
+```
+
+
+### abstinence -> impulsivity  -> craving (brain only)
+
+```{R}
+# define X, Y, and M
+d$X = d$abstinence_z
+d$Y = d$craving_z
+
+#Computing linear regression for PATH A
+Reg2PathA <- lm(BIS_z ~ X, data = d)
+summary(Reg2PathA)
+
+#Conducting linear regression for PATH B and C'
+Reg2DirectEffect <- lm(Y ~ BIS_z + X, data = d)
+summary(Reg2DirectEffect)
+
+# Using PROCESS macro 
+
+process(d, y="Y", x="X", m= c("BIS_z"), model = 4,  effsize = 1,total = 1,  normal = 1, boot = 5000, seed = 9999)  
 
 ```
